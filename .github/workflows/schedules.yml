@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_updates: ${{ steps.set-matrix.outputs.has_updates }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -66,8 +67,11 @@ jobs:
         
         # 创建矩阵
         matrix = {'include': needs_update}
+        matrix_json = json.dumps(matrix_data)
         with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write(f"matrix={json.dumps(matrix)}\n")
+            f.write(f"matrix={matrix_json}\n")
+            has_updates = 'true' if needs_update else 'false'
+            f.write(f"has_updates={has_updates}\n")
         
       shell: python
     
@@ -77,10 +81,7 @@ jobs:
 
   update-single:
     needs: check-updates
-    if: |
-      needs.check-updates.outputs.matrix != '' && 
-      needs.check-updates.outputs.matrix != '{"include": []}' &&
-      fromJson(needs.check-updates.outputs.matrix).include != []
+    if: needs.check-updates.outputs.has_updates == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.check-updates.outputs.matrix) }}
