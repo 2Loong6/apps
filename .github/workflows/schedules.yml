@@ -73,7 +73,7 @@ jobs:
     
     - name: Log update summary
       run: |
-        echo "Updates needed: ${{ toJson(fromJson(needs.check-updates.outputs.matrix).include) }}"
+        echo "Update matrix result: ${{ steps.set-matrix.outputs.matrix }}"
 
   update-single:
     needs: check-updates
