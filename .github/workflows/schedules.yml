@@ -66,7 +66,7 @@ jobs:
                 print(f"Error checking {json_file.name}: {e}")
         
         # 创建矩阵
-        matrix = {'include': needs_update}
+        matrix_data = {'include': needs_update}
         matrix_json = json.dumps(matrix_data)
         with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
             f.write(f"matrix={matrix_json}\n")
