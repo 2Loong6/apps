@@ -77,7 +77,10 @@ jobs:
 
   update-single:
     needs: check-updates
-    if: ${{ fromJson(needs.check-updates.outputs.matrix).include != '[]' }}
+    if: |
+      needs.check-updates.outputs.matrix != '' && 
+      needs.check-updates.outputs.matrix != '{"include": []}' &&
+      fromJson(needs.check-updates.outputs.matrix).include != []
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.check-updates.outputs.matrix) }}
