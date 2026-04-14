@@ -141,13 +141,13 @@ jobs:
             # 使用系统 curl 下载，添加 -L 处理重定向，-s 保持静默，-A 伪装 User-Agent
             # 如果是 Windows Runner，路径请改为 os.environ.get('TEMP')
             curl_command = [
-                "curl",
-                "-L",                # 跟随重定向
-                "-s",                # 静默模式
-                "-o", temp_file,     # 输出文件
-                "--retry", "3",      # 失败重试
-                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-                download_url
+                "curl", "-L", "--compressed",
+                "-H", "Host: dl.todesk.com",
+                "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "-H", "Referer: https://www.todesk.com/",
+                "-H", "Accept: */*",
+                "-o", temp_file,
+                url
             ]
             
             try:
