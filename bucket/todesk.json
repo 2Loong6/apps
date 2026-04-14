@@ -1,12 +1,12 @@
 {
-    "version": "4.8.7.5",
+    "version": "4.8.8.1",
     "description": "A unlimited speed multifunctional remote control software",
     "homepage": "https://www.todesk.com/",
     "license": "Proprietary",
     "architecture": {
         "64bit": {
-            "url": "https://dl.todesk.com/irrigation/ToDesk_4.8.7.5.exe#/dl.7z",
-            "hash": "ca2af9fd2000ead083df1a595ab4f3e63dceaa279c68a7f2496426f548845461"
+            "url": "https://dl.todesk.com/irrigation/ToDesk_4.8.8.1.exe#/dl.7z",
+            "hash": "ac936313b224bc0c5a29e20835b49ff50d63ca22fb0c58225e17fe773d61d5fc"
         }
     },
     "pre_install": [
