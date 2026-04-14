@@ -147,7 +147,7 @@ jobs:
                 "-H", "Referer: https://www.todesk.com/",
                 "-H", "Accept: */*",
                 "-o", temp_file,
-                url
+                download_url
             ]
             
             try:
