@@ -33,48 +33,84 @@ jobs:
         import json
         import re
         import os
+        import sys
         from pathlib import Path
-        
+
+        # 强制刷新输出，确保日志实时显示
+        def log(msg):
+            print(msg, flush=True)
+
+        log("--- 🚀 Debug Start ---")
+        log(f"Current Working Directory: {os.getcwd()}")
+
         manifests_dir = Path('apps/bucket')
+        log(f"Checking Path: {manifests_dir.absolute()}")
+
+        # 检查目录是否存在
+        if not manifests_dir.exists():
+            log(f"❌ ERROR: Directory '{manifests_dir}' does not exist!")
+            # 列出当前目录下的文件，帮你找找路径
+            log(f"Root contents: {os.listdir('.')}")
+        else:
+            log(f"✅ Directory found.")
+
+        # 获取文件列表
+        all_files = list(manifests_dir.glob('*.json'))
+        log(f"Found {len(all_files)} .json files.")
+
         needs_update = []
-        
-        for json_file in manifests_dir.glob('*.json'):
-            with open(json_file, 'r', encoding='utf-8') as f:
-                manifest = json.load(f)
-            
-            if 'checkver' not in manifest:
-                continue
-            
-            # 检查是否有新版本（这里只检测，不下载）
-            checkver_url = manifest['checkver']['url']
-            regex_pattern = manifest['checkver']['regex']
-            
+
+        for json_file in all_files:
+            log(f"🔍 Processing: {json_file.name}")
             try:
-                import requests
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+                
+                if 'checkver' not in manifest:
+                    log(f"  - Skip: No 'checkver' key")
+                    continue
+
+                checkver_url = manifest['checkver']['url']
+                regex_pattern = manifest['checkver']['regex']
+                
+                # 尝试导入 requests
+                try:
+                    import requests
+                except ImportError:
+                    log("  - ❌ ERROR: 'requests' module not found. Please add 'pip install requests' step.")
+                    break # 没库就不用继续了
+
                 response = requests.get(checkver_url, timeout=30)
-                response.raise_for_status()
+                log(f"  - Request status: {response.status_code}")
                 
                 match = re.search(regex_pattern, response.text)
                 if match:
                     new_version = match.group(1)
                     current_version = manifest.get('version')
+                    log(f"  - Local: {current_version}, Remote: {new_version}")
                     
-                    if new_version != current_version:
+                    if str(new_version) != str(current_version):
                         needs_update.append({
                             'file': json_file.name,
                             'current_version': current_version,
                             'new_version': new_version
                         })
+                else:
+                    log(f"  - ⚠️ Regex mismatch")
+
             except Exception as e:
-                print(f"Error checking {json_file.name}: {e}")
-        
-        # 创建矩阵
+                log(f"  - ❌ Exception for {json_file.name}: {str(e)}")
+
+        # 写入输出
         matrix_data = {'include': needs_update}
         matrix_json = json.dumps(matrix_data)
+
         with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
             f.write(f"matrix={matrix_json}\n")
             has_updates = 'true' if needs_update else 'false'
             f.write(f"has_updates={has_updates}\n")
+
+        log(f"--- ✅ Debug End. Found updates: {len(needs_update)} ---")
         
       shell: python
     
