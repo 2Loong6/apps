@@ -119,7 +119,7 @@ jobs:
         import os
         from pathlib import Path
         
-        manifest_path = Path('apps/bucket') / '${{ matrix.file }}'
+        manifest_path = Path('bucket') / '${{ matrix.file }}'
         
         with open(manifest_path, 'r', encoding='utf-8') as f:
             manifest = json.load(f)
