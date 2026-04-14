@@ -115,7 +115,7 @@ jobs:
         import json
         import re
         import hashlib
-        import requests
+        import subprocess
         import os
         from pathlib import Path
         
@@ -126,7 +126,6 @@ jobs:
         
         new_version = '${{ matrix.new_version }}'
         
-        # 更新所有架构
         architectures = manifest['architecture'].keys()
         for arch in architectures:
             if arch not in manifest['autoupdate']['architecture']:
@@ -135,15 +134,34 @@ jobs:
             url_template = manifest['autoupdate']['architecture'][arch]['url']
             download_url = url_template.replace('$version', new_version)
             
-            print(f"Downloading {arch} from: {download_url}")
-            file_response = requests.get(download_url, timeout=60, stream=True)
-            file_response.raise_for_status()
+            print(f"Downloading {arch} via system curl from: {download_url}")
             
             temp_file = f"/tmp/{Path(manifest_path).stem}_{arch}_{new_version}.exe"
-            with open(temp_file, 'wb') as f:
-                for chunk in file_response.iter_content(chunk_size=8192):
-                    f.write(chunk)
             
+            # 使用系统 curl 下载，添加 -L 处理重定向，-s 保持静默，-A 伪装 User-Agent
+            # 如果是 Windows Runner，路径请改为 os.environ.get('TEMP')
+            curl_command = [
+                "curl",
+                "-L",                # 跟随重定向
+                "-s",                # 静默模式
+                "-o", temp_file,     # 输出文件
+                "--retry", "3",      # 失败重试
+                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+                download_url
+            ]
+            
+            try:
+                subprocess.run(curl_command, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error downloading with curl: {e}")
+                continue
+
+            # 校验文件大小，防止下载了 1kb 的报错页面
+            if os.path.getsize(temp_file) < 10240: # 小于 10KB 视为下载失败
+                print(f"Warning: Downloaded file for {arch} is too small, likely an error page.")
+                continue
+            
+            # 计算 Hash
             sha256_hash = hashlib.sha256()
             with open(temp_file, 'rb') as f:
                 for byte_block in iter(lambda: f.read(4096), b""):
@@ -161,7 +179,6 @@ jobs:
             json.dump(manifest, f, indent=4, ensure_ascii=False)
         
         print(f"✓ Updated to version {new_version}")
-        
       shell: python
     
     - name: Create Pull Request
