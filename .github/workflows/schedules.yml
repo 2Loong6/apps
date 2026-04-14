@@ -113,10 +113,10 @@ jobs:
       id: update
       run: |
         import json
-        import re
         import hashlib
         import subprocess
         import os
+        import tempfile
         from pathlib import Path
         
         manifest_path = Path('bucket') / '${{ matrix.file }}'
@@ -134,51 +134,64 @@ jobs:
             url_template = manifest['autoupdate']['architecture'][arch]['url']
             download_url = url_template.replace('$version', new_version)
             
-            print(f"Downloading {arch} via system curl from: {download_url}")
+            print(f"🚀 Downloading {arch} via optimized curl: {download_url}")
             
-            temp_file = f"/tmp/{Path(manifest_path).stem}_{arch}_{new_version}.exe"
+            # 使用 tempfile 确保跨平台兼容 (Linux /tmp, Windows TEMP)
+            temp_dir = tempfile.gettempdir()
+            temp_file = os.path.join(temp_dir, f"{Path(manifest_path).stem}_{arch}_{new_version}.exe")
             
-            # 使用系统 curl 下载，添加 -L 处理重定向，-s 保持静默，-A 伪装 User-Agent
-            # 如果是 Windows Runner，路径请改为 os.environ.get('TEMP')
+            # 完整平移你测试成功的 curl 参数
             curl_command = [
-                "curl", "-L", "--compressed",
+                "curl", "-L", "-k",
+                "--compressed",
+                "--retry", "3",
+                "--http2",
                 "-H", "Host: dl.todesk.com",
+                "-H", "Connection: keep-alive",
+                "-H", "Upgrade-Insecure-Requests: 1",
                 "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "-H", "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "-H", "Sec-Fetch-Site: cross-site",
+                "-H", "Sec-Fetch-Mode: navigate",
+                "-H", "Sec-Fetch-Dest: document",
                 "-H", "Referer: https://www.todesk.com/",
-                "-H", "Accept: */*",
+                "-H", "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8",
                 "-o", temp_file,
                 download_url
             ]
             
             try:
-                subprocess.run(curl_command, check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"Error downloading with curl: {e}")
-                continue
+                # 使用 check=True，如果 curl 返回非零状态码将抛出异常
+                subprocess.run(curl_command, check=True, capture_output=True, text=True)
+                
+                # 双重校验：文件是否存在以及大小是否正常 (ToDesk exe 通常 > 50MB)
+                if not os.path.exists(temp_file) or os.path.getsize(temp_file) < 100 * 1024:
+                    print(f"❌ {arch} 下载文件过小或不存在，可能触发了挑战页")
+                    if os.path.exists(temp_file): os.remove(temp_file)
+                    continue
 
-            # 校验文件大小，防止下载了 1kb 的报错页面
-            if os.path.getsize(temp_file) < 10240: # 小于 10KB 视为下载失败
-                print(f"Warning: Downloaded file for {arch} is too small, likely an error page.")
-                continue
-            
-            # 计算 Hash
-            sha256_hash = hashlib.sha256()
-            with open(temp_file, 'rb') as f:
-                for byte_block in iter(lambda: f.read(4096), b""):
-                    sha256_hash.update(byte_block)
-            
-            file_hash = sha256_hash.hexdigest()
-            manifest['architecture'][arch]['url'] = download_url
-            manifest['architecture'][arch]['hash'] = file_hash
-            
-            os.remove(temp_file)
+                # 计算 SHA256
+                sha256_hash = hashlib.sha256()
+                with open(temp_file, 'rb') as f:
+                    for byte_block in iter(lambda: f.read(65536), b""): # 增大 buffer 提高计算速度
+                        sha256_hash.update(byte_block)
+                
+                file_hash = sha256_hash.hexdigest()
+                manifest['architecture'][arch]['url'] = download_url
+                manifest['architecture'][arch]['hash'] = file_hash
+                print(f"✅ {arch} updated. Hash: {file_hash[:10]}...")
+                
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Curl failed for {arch}: {e.stderr}")
+            finally:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
         
         manifest['version'] = new_version
-        
         with open(manifest_path, 'w', encoding='utf-8') as f:
             json.dump(manifest, f, indent=4, ensure_ascii=False)
         
-        print(f"✓ Updated to version {new_version}")
+        print(f"✨ Manifest updated to version {new_version}")
       shell: python
     
     - name: Create Pull Request
