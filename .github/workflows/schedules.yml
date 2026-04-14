@@ -24,6 +24,9 @@ jobs:
       with:
         python-version: '3.10'
     
+    - name: Install dependencies
+      run: pip install requests
+    
     - name: Check which manifests need update
       id: set-matrix
       run: |
